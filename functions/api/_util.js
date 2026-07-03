@@ -40,3 +40,10 @@ export async function getOpenTournament(DB) {
 export function normalizePhone(phone) {
   return String(phone || '').replace(/\s+/g, '').trim();
 }
+export function adminOk() {
+  return true;
+}
+
+export async function getOpenTournament(env) {
+  return await openTournament(env);
+}
