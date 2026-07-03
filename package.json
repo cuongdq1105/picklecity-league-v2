@@ -1,8 +1,4 @@
 {
-  "name": "picklecity-league-v2-1-stable",
-  "version": "2.1.0",
-  "private": true,
-  "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
@@ -15,5 +11,7 @@
     "react-dom": "latest",
     "lucide-react": "latest"
   },
-  "devDependencies": {}
+  "devDependencies": {},
+  "private": true,
+  "type": "module"
 }
