@@ -1,0 +1,4 @@
+-- Required tables: members, event_types, tournaments, registrations
+-- Optional Cloudflare Pages variable:
+-- ADMIN_KEY=your-secret-password
+-- Default admin password if ADMIN_KEY is not set: PTC2026

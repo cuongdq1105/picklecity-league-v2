@@ -1,58 +1,48 @@
-import { json, getMemberConfig, getOpenTournament, normalizePhone } from './_util.js';
+import { json, getOpenTournament } from './_utils.js';
 
 export async function onRequestPost({ request, env }) {
   try {
-    if (!env.DB) return json({ ok: false, error: 'Missing DB binding' }, { status: 500 });
-
     const body = await request.json();
-    const fullName = String(body.full_name || '').trim();
-    const phone = normalizePhone(body.phone);
+    const fullName = (body.full_name || '').trim();
+    const phone = (body.phone || '').replace(/\s+/g, '').trim();
     const gender = body.gender || 'male';
-    const markedPaid = !!body.marked_paid;
+    const note = (body.note || '').trim();
 
-    if (!fullName || !phone) {
-      return json({ ok: false, error: 'Vui lòng nhập họ tên và số điện thoại.' }, { status: 400 });
+    if (!fullName || !phone) return json({ ok: false, error: 'Thiếu họ tên hoặc số điện thoại.' }, 400);
+
+    const tournament = await getOpenTournament(env);
+    if (!tournament) return json({ ok: false, error: 'Hiện chưa có giải đang mở đăng ký.' }, 400);
+
+    const count = await env.DB.prepare('SELECT COUNT(*) AS c FROM registrations WHERE tournament_id=?').bind(tournament.id).first();
+    if (tournament.max_players && count.c >= tournament.max_players) {
+      return json({ ok: false, error: 'Giải đã đủ số lượng VĐV đăng ký.' }, 400);
     }
 
-    const tournament = await getOpenTournament(env.DB);
-    if (!tournament) return json({ ok: false, error: 'Hiện chưa có giải đang mở đăng ký.' }, { status: 400 });
-
-    const { memberTable, memberIdColumn } = await getMemberConfig(env.DB);
-
-    let member = await env.DB.prepare(`SELECT * FROM ${memberTable} WHERE phone = ?`).bind(phone).first();
-
+    let member = await env.DB.prepare('SELECT * FROM members WHERE phone=?').bind(phone).first();
     if (!member) {
       await env.DB.prepare(`
-        INSERT INTO ${memberTable} (full_name, phone, gender, level_group, level_score)
-        VALUES (?, ?, ?, 'UNRANKED', 1000)
+        INSERT INTO members (full_name, phone, gender, level_group, level_score, ranking_score, status)
+        VALUES (?, ?, ?, 'UNRANKED', 1000, 0, 'ACTIVE')
       `).bind(fullName, phone, gender).run();
-      member = await env.DB.prepare(`SELECT * FROM ${memberTable} WHERE phone = ?`).bind(phone).first();
+      member = await env.DB.prepare('SELECT * FROM members WHERE phone=?').bind(phone).first();
     } else {
-      await env.DB.prepare(`UPDATE ${memberTable} SET full_name = ?, gender = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
-        .bind(fullName, gender, member.id).run().catch(async () => {
-          await env.DB.prepare(`UPDATE ${memberTable} SET full_name = ?, gender = ? WHERE id = ?`).bind(fullName, gender, member.id).run();
-        });
+      await env.DB.prepare('UPDATE members SET full_name=?, gender=?, updated_at=CURRENT_TIMESTAMP WHERE id=?')
+        .bind(fullName, gender, member.id).run();
     }
 
-    const existing = await env.DB.prepare(`
-      SELECT * FROM registrations WHERE tournament_id = ? AND ${memberIdColumn} = ? LIMIT 1
-    `).bind(tournament.id, member.id).first();
-
-    const status = markedPaid ? 'PLAYER_MARKED_PAID' : 'PENDING';
-
+    const existing = await env.DB.prepare('SELECT * FROM registrations WHERE tournament_id=? AND member_id=?')
+      .bind(tournament.id, member.id).first();
     if (existing) {
-      await env.DB.prepare(`UPDATE registrations SET payment_status = ?, payment_amount = ? WHERE id = ?`)
-        .bind(status, tournament.fee || 150000, existing.id).run();
-      return json({ ok: true, updated: true, registration_id: existing.id });
+      return json({ ok: true, duplicated: true, message: 'SĐT này đã đăng ký giải hiện tại.', registration_id: existing.id });
     }
 
-    const result = await env.DB.prepare(`
-      INSERT INTO registrations (tournament_id, ${memberIdColumn}, payment_amount, payment_status)
-      VALUES (?, ?, ?, ?)
-    `).bind(tournament.id, member.id, tournament.fee || 150000, status).run();
+    await env.DB.prepare(`
+      INSERT INTO registrations (tournament_id, member_id, payment_amount, payment_status, note)
+      VALUES (?, ?, ?, 'PLAYER_MARKED_PAID', ?)
+    `).bind(tournament.id, member.id, tournament.fee || 150000, note).run();
 
-    return json({ ok: true, registration_id: result.meta?.last_row_id || null });
+    return json({ ok: true, message: 'Đăng ký thành công. Vui lòng chờ BTC xác nhận thanh toán.' });
   } catch (e) {
-    return json({ ok: false, error: e.message || String(e) }, { status: 500 });
+    return json({ ok: false, error: e.message }, 500);
   }
 }

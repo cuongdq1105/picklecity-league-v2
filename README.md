@@ -1,22 +1,21 @@
-# PickleCity League V2 Clean
+# PickleCity League V2.1 Stable
 
-Bản sạch dùng Cloudflare Pages + Pages Functions + D1 Database.
+## Tính năng
+- STK hiển thị: 202.202.6868
+- Danh sách công khai cho VĐV/khán giả, ẩn phân hạng
+- Dashboard BTC có mật khẩu
+- BTC xem/sửa phân hạng A+/A/B+/B/C
+- BTC xác nhận thanh toán hoặc hoàn tác
+- Chống đăng ký trùng trong cùng giải
+- API Cloudflare Pages Functions, không dùng `_worker.js`, không dùng `_middleware.js`
 
-## Cấu hình Cloudflare Pages
-
-- Git repository: `cuongdq1105/picklecity-league-v2`
+## Cloudflare Pages
 - Build command: `npm install && npm run build`
-- Build output directory: `dist`
-- D1 Binding:
-  - Variable name: `DB`
-  - Database: `picklecity-db`
+- Build output: `dist`
+- D1 binding: `DB` -> `picklecity-db`
+- Optional variable: `ADMIN_KEY` (nếu không đặt, mật khẩu mặc định là `PTC2026`)
 
-## Test API sau deploy
-
+## Test sau deploy
 - `/api/ping`
 - `/api/tournament`
 - `/api/registrations`
-
-## Lưu ý
-
-Project này chỉ dùng `functions/`, không dùng `_worker.js` để tránh xung đột routing.
