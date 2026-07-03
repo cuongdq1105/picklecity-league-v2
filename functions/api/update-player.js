@@ -1,28 +1,12 @@
-import { json, getMemberTable } from './_utils.js';
-
-export async function onRequestPost({ request, env }) {
+import { json, ensureColumns } from './_utils.js';
+export async function onRequestPost({request,env}) {
   try {
-    const body = await request.json();
-    const memberId = Number(body.member_id);
-    if (!memberId) return json({ ok: false, error: "Thiếu member_id" }, { status: 400 });
-
-    const memberTable = await getMemberTable(env);
-    const fullName = String(body.full_name || '').trim();
-    const phone = String(body.phone || '').trim();
-    const gender = body.gender || 'male';
-    const levelGroup = body.level_group || 'UNRANKED';
-    const levelScore = Number(body.level_score || 1000);
-
-    if (!fullName || !phone) return json({ ok: false, error: "Thiếu họ tên hoặc SĐT" }, { status: 400 });
-
-    await env.DB.prepare(`
-      UPDATE ${memberTable}
-      SET full_name = ?, phone = ?, gender = ?, level_group = ?, level_score = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).bind(fullName, phone, gender, levelGroup, levelScore, memberId).run();
-
-    return json({ ok: true });
-  } catch (e) {
-    return json({ ok: false, error: e.message }, { status: 500 });
-  }
+    await ensureColumns(env);
+    const b=await request.json();
+    const id=Number(b.member_id), fullName=String(b.full_name||'').trim(), phone=String(b.phone||'').trim();
+    const gender=b.gender||'male', level=b.level_group||'UNRANKED', score=Number(b.level_score||1000);
+    if(!id||!fullName||!phone) return json({ok:false,error:'Thiếu thông tin VĐV'},{status:400});
+    await env.DB.prepare('UPDATE members SET full_name=?,phone=?,gender=?,level_group=?,level_score=?,updated_at=CURRENT_TIMESTAMP WHERE id=?').bind(fullName,phone,gender,level,score,id).run();
+    return json({ok:true});
+  } catch(e) { return json({ok:false,error:e.message},{status:500}); }
 }

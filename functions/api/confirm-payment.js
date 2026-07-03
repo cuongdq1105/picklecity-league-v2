@@ -1,20 +1,2 @@
-import { json } from './_utils.js';
-
-export async function onRequestPost({ request, env }) {
-  try {
-    const body = await request.json();
-    const id = Number(body.registration_id);
-    const status = body.status || 'BTC_CONFIRMED';
-    if (!id) return json({ ok: false, error: "Thiếu registration_id" }, { status: 400 });
-
-    await env.DB.prepare(`
-      UPDATE registrations
-      SET payment_status = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).bind(status, id).run();
-
-    return json({ ok: true });
-  } catch (e) {
-    return json({ ok: false, error: e.message }, { status: 500 });
-  }
-}
+import { json, ensureColumns } from './_utils.js';
+export async function onRequestPost({request,env}){try{await ensureColumns(env);const b=await request.json();const id=Number(b.registration_id);if(!id)return json({ok:false,error:'Thiếu registration_id'},{status:400});await env.DB.prepare('UPDATE registrations SET payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?').bind(b.status||'BTC_CONFIRMED',id).run();return json({ok:true});}catch(e){return json({ok:false,error:e.message},{status:500});}}
