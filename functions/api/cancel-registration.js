@@ -1,17 +1,17 @@
-import { json } from './_utils.js';
+import { json, ensureRegistrationsColumns } from './_utils.js';
 
 export async function onRequestPost({ request, env }) {
   try {
+    await ensureRegistrationsColumns(env);
     const body = await request.json();
     const id = Number(body.registration_id);
-    const status = body.status || 'BTC_CONFIRMED';
     if (!id) return json({ ok: false, error: "Thiếu registration_id" }, { status: 400 });
 
     await env.DB.prepare(`
       UPDATE registrations
-      SET payment_status = ?, updated_at = CURRENT_TIMESTAMP
+      SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).bind(status, id).run();
+    `).bind(id).run();
 
     return json({ ok: true });
   } catch (e) {

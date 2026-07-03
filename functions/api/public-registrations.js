@@ -1,10 +1,16 @@
 import { json, ensureRegistrationsColumns, getMemberTable, getRegistrationMemberCol, openTournament } from './_utils.js';
 
+function maskPhone(phone='') {
+  const s = String(phone);
+  if (s.length <= 6) return s;
+  return s.slice(0, 4) + '***' + s.slice(-3);
+}
+
 export async function onRequestGet({ env }) {
   try {
     await ensureRegistrationsColumns(env);
     const tournament = await openTournament(env);
-    if (!tournament) return json({ ok: true, registrations: [], stats: { total: 0, confirmed: 0, pending: 0 } });
+    if (!tournament) return json({ ok: true, registrations: [] });
 
     const memberTable = await getMemberTable(env);
     const memberCol = await getRegistrationMemberCol(env);
@@ -13,16 +19,10 @@ export async function onRequestGet({ env }) {
       SELECT
         r.id AS registration_id,
         r.payment_status,
-        r.payment_amount,
-        r.status,
-        r.note,
         r.created_at,
-        m.id AS member_id,
         m.full_name,
         m.phone,
-        m.gender,
-        COALESCE(m.level_group, 'UNRANKED') AS level_group,
-        COALESCE(m.level_score, 1000) AS level_score
+        m.gender
       FROM registrations r
       LEFT JOIN ${memberTable} m ON m.id = r.${memberCol}
       WHERE r.tournament_id = ?
@@ -30,12 +30,17 @@ export async function onRequestGet({ env }) {
       ORDER BY r.id DESC
     `).bind(tournament.id).all();
 
-    const registrations = rows.results || [];
-    const confirmed = registrations.filter(x => x.payment_status === 'BTC_CONFIRMED').length;
-    const pending = registrations.length - confirmed;
+    const registrations = (rows.results || []).map(x => ({
+      registration_id: x.registration_id,
+      full_name: x.full_name,
+      phone_masked: maskPhone(x.phone),
+      gender: x.gender,
+      payment_status: x.payment_status,
+      created_at: x.created_at
+    }));
 
-    return json({ ok: true, tournament, registrations, stats: { total: registrations.length, confirmed, pending } });
+    return json({ ok: true, tournament, registrations });
   } catch (e) {
-    return json({ ok: false, error: e.message, registrations: [], stats: { total: 0, confirmed: 0, pending: 0 } }, { status: 500 });
+    return json({ ok: false, error: e.message, registrations: [] }, { status: 500 });
   }
 }
